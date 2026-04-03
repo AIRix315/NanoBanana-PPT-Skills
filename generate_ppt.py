@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """
-PPT Generator - Generate PPT slide images using Google Gemini API.
+PPT Generator - Generate PPT slide images using RunningHub API.
 
 This script generates PPT slide images based on a slide plan and style template,
 then creates an HTML viewer for playback.
+
+Supports multiple image models:
+- 全能图片V2 (Gemini 3.1 Flash) - Fast, cost-effective for drafts
+- 全能图片PRO (Gemini 3 Pro) - High quality, 4K resolution for final output
 """
 
 import argparse
@@ -15,6 +19,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
+
+from rh_api import RunningHubClient, get_rh_client, RunningHubError
 
 
 # =============================================================================
@@ -160,86 +166,62 @@ Container material must be frosted glass with blur effect:
 
 
 # =============================================================================
-# Image Generation
+# Image Generation (RunningHub API)
 # =============================================================================
-
-def get_gemini_client():
-    """
-    Initialize and return Gemini API client.
-
-    Returns:
-        Configured genai.Client instance.
-
-    Raises:
-        SystemExit: If google-genai is not installed or API key is missing.
-    """
-    try:
-        from google import genai
-    except ImportError:
-        print("Error: google-genai library not installed")
-        print("Please run: pip install google-genai")
-        sys.exit(1)
-
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        print("Error: GEMINI_API_KEY environment variable not set")
-        print("Please set: export GEMINI_API_KEY='your-api-key'")
-        sys.exit(1)
-
-    return genai.Client(api_key=api_key)
-
 
 def generate_slide(
     prompt: str,
     slide_number: int,
     output_dir: str,
     resolution: str = DEFAULT_RESOLUTION,
+    model: str = "pro",
+    client: Optional[RunningHubClient] = None,
 ) -> Optional[str]:
     """
-    Generate a single PPT slide image using Gemini API.
+    Generate a single PPT slide image using RunningHub API.
 
     Args:
         prompt: The generation prompt.
         slide_number: Slide number for filename.
         output_dir: Output directory path.
-        resolution: Image resolution (2K or 4K).
+        resolution: Image resolution (1K, 2K, or 4K).
+        model: Model type - "v2" (fast/draft) or "pro" (high quality).
+        client: Optional RunningHub client instance.
 
     Returns:
         Path to saved image, or None if generation failed.
     """
-    from google.genai import types
-
-    print(f"Generating slide {slide_number}...")
+    print(f"🎨 生成第 {slide_number} 页...")
+    print(f"  模型: {'全能图片V2' if model == 'v2' else '全能图片PRO'}")
+    print(f"  分辨率: {resolution}")
 
     try:
-        client = get_gemini_client()
-        response = client.models.generate_content(
-            model="gemini-3-pro-image-preview",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_modalities=["IMAGE"],
-                image_config=types.ImageConfig(
-                    aspect_ratio="16:9",
-                    image_size=resolution,
-                ),
-            ),
+        # 初始化客户端（如果未提供）
+        if client is None:
+            client = get_rh_client()
+        
+        # 准备输出路径
+        image_path = os.path.join(
+            output_dir, "images", f"slide-{slide_number:02d}.png"
         )
+        
+        # 调用 RunningHub API
+        client.generate_image(
+            prompt=prompt,
+            model=model,
+            aspect_ratio="16:9",
+            resolution=resolution,
+            output_path=image_path,
+        )
+        
+        print(f"✅ 第 {slide_number} 页已保存: {image_path}")
+        return image_path
 
-        for part in response.parts:
-            if part.inline_data is not None:
-                image = part.as_image()
-                image_path = os.path.join(
-                    output_dir, "images", f"slide-{slide_number:02d}.png"
-                )
-                image.save(image_path)
-                print(f"  Slide {slide_number} saved: {image_path}")
-                return image_path
-
-        print(f"  Slide {slide_number} failed: No image data received")
+    except RunningHubError as e:
+        print(f"❌ 第 {slide_number} 页失败: {e}")
         return None
-
     except Exception as e:
-        print(f"  Slide {slide_number} failed: {e}")
+        print(f"❌ 第 {slide_number} 页失败（未知错误）: {e}")
         return None
 
 
@@ -308,15 +290,23 @@ def save_prompts(output_dir: str, prompts_data: Dict[str, Any]) -> str:
 def create_argument_parser() -> argparse.ArgumentParser:
     """Create and configure argument parser."""
     parser = argparse.ArgumentParser(
-        description="PPT Generator - Generate PPT images using Gemini API",
+        description="PPT Generator - Generate PPT images using RunningHub API (国内中转)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Example usage:
-  python generate_ppt.py --plan slides_plan.json --style styles/gradient-glass.md --resolution 2K
+  # 草稿模式（快速、低成本）
+  python generate_ppt.py --plan slides.json --style styles/gradient-glass.md --draft
+
+  # 最终模式（高质量）
+  python generate_ppt.py --plan slides.json --style styles/gradient-glass.md --model pro --resolution 4K
+
+  # 指定模型
+  python generate_ppt.py --plan slides.json --style styles/gradient-glass.md --model v2
 
 Environment variables:
-  GEMINI_API_KEY: Google AI API key (required)
-""",
+  RH_API_KEY: RunningHub API key (required)
+    Get from: https://www.runninghub.cn/enterprise-api/sharedApi
+        """,
     )
 
     parser.add_argument(
@@ -331,9 +321,24 @@ Environment variables:
     )
     parser.add_argument(
         "--resolution",
-        choices=["2K", "4K"],
+        choices=["1K", "2K", "4K"],
         default=DEFAULT_RESOLUTION,
         help=f"Image resolution (default: {DEFAULT_RESOLUTION})",
+    )
+    parser.add_argument(
+        "--model",
+        choices=["v2", "pro"],
+        default="pro",
+        help=(
+            "Image generation model:\n"
+            "  v2: 全能图片V2 (Gemini 3.1 Flash) - Fast, cost-effective\n"
+            "  pro: 全能图片PRO (Gemini 3 Pro) - High quality, 4K (default)"
+        ),
+    )
+    parser.add_argument(
+        "--draft",
+        action="store_true",
+        help="Draft mode shortcut: use v2 model + 1K resolution for fast generation",
     )
     parser.add_argument(
         "--output",
@@ -357,6 +362,10 @@ def main() -> None:
     parser = create_argument_parser()
     args = parser.parse_args()
 
+    # Handle draft mode
+    model = "v2" if args.draft else args.model
+    resolution = "1K" if args.draft else args.resolution
+
     # Load slides plan
     with open(args.plan, "r", encoding="utf-8") as f:
         slides_plan = json.load(f)
@@ -378,21 +387,30 @@ def main() -> None:
     total_slides = len(slides)
 
     print("=" * 60)
-    print("PPT Generator Started")
+    print("PPT Generator - RunningHub API (国内中转)")
     print("=" * 60)
-    print(f"Style: {args.style}")
-    print(f"Resolution: {args.resolution}")
-    print(f"Slides: {total_slides}")
-    print(f"Output: {output_dir}")
+    print(f"风格: {args.style}")
+    print(f"模型: {'全能图片V2 (草稿模式)' if args.draft else '全能图片PRO' if model == 'pro' else '全能图片V2'}")
+    print(f"分辨率: {resolution}")
+    print(f"总页数: {total_slides}")
+    print(f"输出目录: {output_dir}")
     print("=" * 60)
     print()
+
+    # Initialize RunningHub client
+    try:
+        client = get_rh_client()
+    except RunningHubError as e:
+        print(f"❌ RunningHub 客户端初始化失败: {e}")
+        sys.exit(1)
 
     # Initialize prompts data
     prompts_data: Dict[str, Any] = {
         "metadata": {
             "title": slides_plan.get("title", "Untitled Presentation"),
             "total_slides": total_slides,
-            "resolution": args.resolution,
+            "resolution": resolution,
+            "model": model,
             "style": args.style,
             "generated_at": datetime.now().isoformat(),
         },
@@ -415,7 +433,14 @@ def main() -> None:
         )
 
         # Generate image
-        image_path = generate_slide(prompt, slide_number, output_dir, args.resolution)
+        image_path = generate_slide(
+            prompt,
+            slide_number,
+            output_dir,
+            resolution,
+            model,
+            client,  # Reuse client for all slides
+        )
 
         # Record prompt data
         prompts_data["slides"].append({
@@ -437,12 +462,13 @@ def main() -> None:
     # Print completion summary
     print()
     print("=" * 60)
-    print("Generation Complete!")
+    print("✅ 生成完成！")
     print("=" * 60)
-    print(f"Output directory: {output_dir}")
-    print(f"Viewer HTML: {os.path.join(output_dir, 'index.html')}")
+    print(f"📁 输出目录: {output_dir}")
+    print(f"🖼️ PPT 图片: {os.path.join(output_dir, 'images')}")
+    print(f"🎬 播放网页: {os.path.join(output_dir, 'index.html')}")
     print()
-    print("Open viewer in browser:")
+    print("打开播放网页：")
     print(f"  open {os.path.join(output_dir, 'index.html')}")
     print()
 
