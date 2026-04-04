@@ -13,7 +13,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from kling_api import KlingVideoGenerator
+from video_providers import create_video_provider
+from video_providers.base import VideoProvider
 from prompt_file_reader import PromptFileReader
 
 
@@ -23,36 +24,57 @@ from prompt_file_reader import PromptFileReader
 
 DEFAULT_MAX_CONCURRENT = 3
 DEFAULT_DURATION = "5"
-DEFAULT_MODE = "pro"
+DEFAULT_MODE = "std"  # std 或 pro
 
 
 # =============================================================================
 # Video Materials Generator
 # =============================================================================
 
+
 class VideoMaterialsGenerator:
     """Generator for PPT video materials (preview and transition videos)."""
 
     def __init__(
         self,
-        kling_client: Optional[KlingVideoGenerator] = None,
+        video_provider: Optional[VideoProvider] = None,
         prompt_generator: Optional[Any] = None,
         max_concurrent: int = DEFAULT_MAX_CONCURRENT,
         prompts_file: Optional[str] = None,
+        provider_type: str = "enterprise-video",
+        enterprise_model: str = "x-low",
     ) -> None:
         """
         Initialize video materials generator.
 
         Args:
-            kling_client: Kling API client instance (created if not provided).
+            video_provider: Video provider instance. If not provided, created from provider_type.
             prompt_generator: Custom prompt generator (prompts_file takes priority).
             max_concurrent: Maximum concurrent video generation tasks.
             prompts_file: Path to prompts JSON file (required if no prompt_generator).
+            provider_type: Provider type for auto-creation.
+                - "kling": 可灵AI (创作级Key)
+                - "seedance": Seedance 2.0 (创作级Key)
+                - "ltx": LTX-2.3 (创作级Key)
+                - "enterprise-video": 企业级视频 (企业Key，默认)
+            enterprise_model: Enterprise video model (仅适用于 enterprise-video)。
+                - "x": 全能视频X
+                - "v3.1-pro": 全能视频V3.1-pro (默认)
 
         Raises:
             ValueError: If neither prompts_file nor prompt_generator is provided.
         """
-        self.kling_client = kling_client or KlingVideoGenerator()
+        # 创建视频提供者（支持动态选择）
+        if video_provider:
+            self.video_provider = video_provider
+        else:
+            # 企业级视频需要传递 model 参数
+            if provider_type == "enterprise-video":
+                self.video_provider = create_video_provider(
+                    provider_type, model=enterprise_model
+                )
+            else:
+                self.video_provider = create_video_provider(provider_type)
         self.max_concurrent = max_concurrent
 
         # Initialize prompt generator
@@ -120,13 +142,12 @@ class VideoMaterialsGenerator:
         start_time = time.time()
 
         try:
-            self.kling_client.generate_and_download(
+            self.video_provider.generate_video(
                 image_start=first_slide_path,
                 image_end=first_slide_path,  # Same as start for looping
                 prompt=preview_prompt,
                 output_path=output_path,
-                model_name="kling-v2-6",
-                duration=duration,
+                duration=int(duration),
                 mode=mode,
             )
 
@@ -189,13 +210,12 @@ class VideoMaterialsGenerator:
 
             start_time = time.time()
 
-            self.kling_client.generate_and_download(
+            self.video_provider.generate_video(
                 image_start=slide_from,
                 image_end=slide_to,
                 prompt=transition_prompt,
                 output_path=output_path,
-                model_name="kling-v2-6",
-                duration=duration,
+                duration=int(duration),
                 mode=mode,
             )
 
@@ -264,12 +284,18 @@ class VideoMaterialsGenerator:
             from_num = Path(slides_paths[i]).stem.split("-")[-1]
             to_num = Path(slides_paths[i + 1]).stem.split("-")[-1]
 
-            tasks.append({
-                "slide_from": slides_paths[i],
-                "slide_to": slides_paths[i + 1],
-                "output_path": os.path.join(output_dir, f"transition_{from_num}_to_{to_num}.mp4"),
-                "content_context": content_contexts[i] if content_contexts and i < len(content_contexts) else None,
-            })
+            tasks.append(
+                {
+                    "slide_from": slides_paths[i],
+                    "slide_to": slides_paths[i + 1],
+                    "output_path": os.path.join(
+                        output_dir, f"transition_{from_num}_to_{to_num}.mp4"
+                    ),
+                    "content_context": content_contexts[i]
+                    if content_contexts and i < len(content_contexts)
+                    else None,
+                }
+            )
 
         # Execute with thread pool
         results: Dict[str, Dict[str, Any]] = {}
@@ -301,12 +327,16 @@ class VideoMaterialsGenerator:
                 completed_count += 1
 
                 if result["success"]:
-                    print(f"  [{completed_count}/{num_transitions}] "
-                          f"Transition {transition_key} complete ({result['duration']}s)")
+                    print(
+                        f"  [{completed_count}/{num_transitions}] "
+                        f"Transition {transition_key} complete ({result['duration']}s)"
+                    )
                 else:
                     failed_count += 1
-                    print(f"  [{completed_count}/{num_transitions}] "
-                          f"Transition {transition_key} failed: {result['error']}")
+                    print(
+                        f"  [{completed_count}/{num_transitions}] "
+                        f"Transition {transition_key} failed: {result['error']}"
+                    )
 
         total_elapsed = int(time.time() - start_time)
 
@@ -314,7 +344,7 @@ class VideoMaterialsGenerator:
         print("\n" + "=" * 80)
         print("Transition Generation Complete")
         print("=" * 80)
-        print(f"  Total time: {total_elapsed}s ({total_elapsed/60:.1f}m)")
+        print(f"  Total time: {total_elapsed}s ({total_elapsed / 60:.1f}m)")
         print(f"  Success: {num_transitions - failed_count}/{num_transitions}")
         print(f"  Failed: {failed_count}/{num_transitions}")
 
@@ -452,6 +482,7 @@ class VideoMaterialsGenerator:
 
 if __name__ == "__main__":
     from dotenv import load_dotenv
+
     load_dotenv()
 
     print("VideoMaterialsGenerator requires a prompts file to run.")

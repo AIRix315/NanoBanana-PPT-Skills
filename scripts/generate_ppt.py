@@ -27,8 +27,10 @@ from rh_api import RunningHubClient, get_rh_client, RunningHubError
 # Constants
 # =============================================================================
 
-DEFAULT_RESOLUTION = "2K"
-DEFAULT_TEMPLATE_PATH = "templates/viewer.html"
+DEFAULT_RESOLUTION = "4K"
+DEFAULT_TEMPLATE_PATH = str(
+    Path(__file__).parent.parent / "assets" / "templates" / "viewer.html"
+)
 OUTPUT_BASE_DIR = "outputs"
 
 # Style template markers
@@ -39,6 +41,7 @@ TEMPLATE_END_MARKER = "## "
 # =============================================================================
 # Environment Configuration
 # =============================================================================
+
 
 def find_and_load_env() -> bool:
     """
@@ -79,6 +82,7 @@ def find_and_load_env() -> bool:
 # Style Template
 # =============================================================================
 
+
 def load_style_template(style_path: str) -> str:
     """
     Load and parse style template file.
@@ -103,12 +107,13 @@ def load_style_template(style_path: str) -> str:
         print("Warning: Could not parse style template, using full content")
         return content
 
-    return content[start_idx + len(start_marker):end_idx].strip()
+    return content[start_idx + len(start_marker) : end_idx].strip()
 
 
 # =============================================================================
 # Prompt Generation
 # =============================================================================
+
 
 def generate_prompt(
     style_template: str,
@@ -169,6 +174,7 @@ Container material must be frosted glass with blur effect:
 # Image Generation (RunningHub API)
 # =============================================================================
 
+
 def generate_slide(
     prompt: str,
     slide_number: int,
@@ -199,12 +205,10 @@ def generate_slide(
         # 初始化客户端（如果未提供）
         if client is None:
             client = get_rh_client()
-        
+
         # 准备输出路径
-        image_path = os.path.join(
-            output_dir, "images", f"slide-{slide_number:02d}.png"
-        )
-        
+        image_path = os.path.join(output_dir, "images", f"slide-{slide_number:02d}.png")
+
         # 调用 RunningHub API
         client.generate_image(
             prompt=prompt,
@@ -213,7 +217,7 @@ def generate_slide(
             resolution=resolution,
             output_path=image_path,
         )
-        
+
         print(f"✅ 第 {slide_number} 页已保存: {image_path}")
         return image_path
 
@@ -228,6 +232,7 @@ def generate_slide(
 # =============================================================================
 # Output Generation
 # =============================================================================
+
 
 def generate_viewer_html(
     output_dir: str,
@@ -286,6 +291,7 @@ def save_prompts(output_dir: str, prompts_data: Dict[str, Any]) -> str:
 # =============================================================================
 # Main Entry Point
 # =============================================================================
+
 
 def create_argument_parser() -> argparse.ArgumentParser:
     """Create and configure argument parser."""
@@ -390,7 +396,9 @@ def main() -> None:
     print("PPT Generator - RunningHub API (国内中转)")
     print("=" * 60)
     print(f"风格: {args.style}")
-    print(f"模型: {'全能图片V2 (草稿模式)' if args.draft else '全能图片PRO' if model == 'pro' else '全能图片V2'}")
+    print(
+        f"模型: {'全能图片V2 (草稿模式)' if args.draft else '全能图片PRO' if model == 'pro' else '全能图片V2'}"
+    )
     print(f"分辨率: {resolution}")
     print(f"总页数: {total_slides}")
     print(f"输出目录: {output_dir}")
@@ -443,13 +451,15 @@ def main() -> None:
         )
 
         # Record prompt data
-        prompts_data["slides"].append({
-            "slide_number": slide_number,
-            "page_type": page_type,
-            "content": content_text,
-            "prompt": prompt,
-            "image_path": image_path,
-        })
+        prompts_data["slides"].append(
+            {
+                "slide_number": slide_number,
+                "page_type": page_type,
+                "content": content_text,
+                "prompt": prompt,
+                "image_path": image_path,
+            }
+        )
 
         print()
 

@@ -1,5 +1,6 @@
 # Python
 venv/
+.venv/
 __pycache__/
 *.pyc
 *.pyo
@@ -11,29 +12,46 @@ __pycache__/
 dist/
 build/
 
+# Linter/Formatter 缓存
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.hypothesis/
+
 # 环境变量和密钥
 .env
+.env.*
 *.key
 *.pem
 
 # 输出文件
 outputs/
+test_outputs/
 *.png
 *.jpg
 *.jpeg
+*.mp4
+*.webm
 
 # 临时文件
 *.tmp
 *.log
+nul
 .DS_Store
+Thumbs.db
+*.suo
+*.user
+
+# IDE
 .vscode/
 .idea/
+*.swp
+*.swo
 
 # 测试文件
 test_*.json
 test_*.py
 *_test.py
-test_outputs/
 
 # 临时工具和示例
 fix_json.py
@@ -42,3 +60,6 @@ verify_new_key.py
 
 # 下载的参考文档
 可灵*.md
+
+# Node modules
+node_modules/

@@ -1,0 +1,13 @@
+name: rh-ppt-skills
+channels:
+  - defaults
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/free
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      - requests
+      - pillow
+      - python-dotenv
+      - pyjwt

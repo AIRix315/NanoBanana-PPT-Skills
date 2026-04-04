@@ -511,6 +511,6 @@ slide-XX.png - 总结：[主题]
 
 ## 📚 参考资源
 
-- **风格定义**: 参考 `styles/gradient-glass.md` 和 `styles/vector-illustration.md`
+- **风格定义**: 参考 `assets/styles/gradient-glass.md` 和 `assets/styles/vector-illustration.md`
 - **GitHub仓库**: https://github.com/op7418/NanoBanana-PPT-Skills
 - **创作者**: 歸藏 [@op7418](https://github.com/op7418)

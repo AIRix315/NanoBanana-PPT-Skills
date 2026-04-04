@@ -1,674 +1,580 @@
-# PPT Generator Pro - Claude Code Skill
+---
+name: rh-ppt-skill
+description: Generate high-quality PPT images and dynamic video presentations using RunningHub API. Use when user requests PPT generation, slide creation, or presentation videos. Invoke for keywords like PPT, 幻灯片, 演示文稿, presentation, slides.
+license: MIT
+allowed-tools:
+  - read
+  - write
+  - bash
+  - rhmcp_rh_upload_media
+  - rhmcp_rh_execute_app
+  - rhmcp_rh_query_task
+metadata:
+  version: "2.1.0"
+  author: "AIRix315"
+  platform: "RunningHub"
+  triggers: PPT, 幻灯片, 演示文稿, presentation, slides, 生成PPT, generate slides
+  output-format: images, videos
+---
 
-## 📋 元数据
+# RH-PPT-Skill - RunningHub PPT 动态视频生成技能
 
-- **Skill 名称**: ppt-generator-pro
-- **版本**: 2.0.0
-- **描述**: 基于 AI 自动生成高质量 PPT 图片和视频，支持智能转场和交互式播放
-- **作者**: 歸藏
-- **标签**: ppt, presentation, video, ai, nano-banana, kling-ai, image-generation
+基于 RunningHub API 自动生成高质量 PPT 图片和动态视频演示。
 
-## ✨ 功能特性
+## 📋 Skill 概述
 
-### 核心功能
-- 🤖 **智能文档分析** - 自动提取核心要点，规划 PPT 内容结构
-- 🎨 **多风格支持** - 内置渐变毛玻璃、矢量插画两种专业风格
-- 🖼️ **高质量图片** - 使用 Nano Banana Pro 生成 16:9 高清 PPT
-- 🎬 **AI 转场视频** - 可灵 AI 生成流畅的页面过渡动画
-- 🎮 **交互式播放器** - 视频+图片混合播放，支持键盘导航
-- 🎥 **完整视频导出** - FFmpeg 合成包含所有转场的完整 PPT 视频
+| 属性 | 值 |
+|------|------|
+| 名称 | rh-ppt-skill |
+| 版本 | 2.1.0 |
+| 平台 | RunningHub |
+| 功能 | PPT 图片生成 + 动态视频演示 |
 
-### 新功能 (v2.0)
-- 🔄 **首页循环预览** - 自动生成吸引眼球的循环动画
-- 🎞️ **智能转场** - 自动生成页面间的过渡视频
-- 🔧 **参数统一** - 自动统一所有视频分辨率和帧率
+## 🚀 快速开始（Agent 执行指南）
 
-## 📦 系统要求
+### 前置条件检查
 
-### 环境变量
+**必须确认：**
+1. `.env` 文件存在且包含 `RH_API_KEY`
+2. Python 环境已安装依赖：`pip install requests pillow python-dotenv`
+3. FFmpeg 已安装（视频功能需要）
 
-**必需：**
-- `GEMINI_API_KEY`: Google AI API 密钥（用于生成 PPT 图片）
+**检查命令：**
+```bash
+# 检查 Key 配置
+grep RH_API_KEY .env
 
-**可选（用于视频功能）：**
-- `KLING_ACCESS_KEY`: 可灵 AI Access Key
-- `KLING_SECRET_KEY`: 可灵 AI Secret Key
+# 检查 FFmpeg
+ffmpeg -version
+```
 
-### Python 依赖
+---
+
+## 🛠️ 可用工具与调用时机
+
+### 工具清单
+
+| 工具脚本 | 功能 | 调用时机 | 预估时间 | API成本 |
+|----------|------|----------|----------|---------|
+| `generate_ppt.py` | 生成PPT图片 | 总是第一步 | ~30秒/页 | 图片模型计费 |
+| `generate_ppt_video.py` | 生成转场视频+合成完整视频 | 用户需要视频时 | ~90-120秒/段 | 视频模型计费 |
+
+### 调用流程图
+
+```
+用户请求 PPT
+     │
+     ▼
+┌─────────────────┐
+│ 1. 检查 .env    │ ← 必须有 RH_API_KEY
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ 2. 收集用户输入 │ ← 主题/文档/风格/页数
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ 3. 规划内容     │ ← 生成 slides_plan.json
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ 4. 生成图片     │ ← 调用 generate_ppt.py
+│    (必需步骤)   │   时间: ~30秒 × 页数
+└────────┬────────┘
+         │
+         ├──────────────────────┐
+         │                      │
+         ▼                      ▼
+┌─────────────────┐    ┌─────────────────┐
+│ 5a. 返回图片   │    │ 5b. 生成视频     │
+│    (可选结束)   │    │    (用户需要)    │
+└─────────────────┘    └────────┬────────┘
+                                │
+                                ▼
+                       ┌─────────────────┐
+                       │ 6. 返回完整结果 │
+                       └─────────────────┘
+```
+
+---
+
+## 📝 Agent 执行流程（详细）
+
+### 阶段 1: 环境检查
+
+**必须检查：**
 
 ```bash
-pip install google-genai pillow python-dotenv
+# Step 1: 检查 .env 文件
+if [ ! -f ".env" ]; then
+    echo "错误: 请创建 .env 文件并配置 RH_API_KEY"
+    exit 1
+fi
+
+# Step 2: 验证 Key 配置
+grep -q "RH_API_KEY=" .env || {
+    echo "错误: .env 中缺少 RH_API_KEY"
+    exit 1
+}
+
+# Step 3: 检查 FFmpeg（视频功能需要）
+command -v ffmpeg >/dev/null 2>&1 || {
+    echo "警告: FFmpeg 未安装，视频功能将不可用"
+    echo "安装: brew install ffmpeg (macOS) 或 sudo apt install ffmpeg (Linux)"
+}
 ```
 
-### 视频功能依赖
+**Agent 行动：**
+- 如果 Key 未配置 → 告诉用户："请先配置 RH_API_KEY，获取地址：https://www.runninghub.cn"
+- 如果 FFmpeg 未安装 → 提示用户视频功能需要安装 FFmpeg
 
-```bash
-# macOS
-brew install ffmpeg
+---
 
-# Ubuntu/Debian
-sudo apt-get install ffmpeg
+### 阶段 2: 收集用户输入
+
+**收集信息清单：**
+
+| 信息 | 必需 | 获取方式 | 默认值 |
+|------|------|----------|--------|
+| 文档/主题内容 | ✅ | 用户直接提供或读取文件 | - |
+| 风格 | ❌ | 列出 `assets/styles/` 目录文件 | 渐变毛玻璃 |
+| 页数 | ❌ | 询问 | 5页 |
+| 分辨率 | ❌ | 询问 | 2K |
+| 是否生成视频 | ❌ | 询问 | 否（仅图片） |
+
+**风格文件位置：**
+```
+assets/styles/
+├── gradient-glass.md      # 渐变毛玻璃（科技/商务）
+└── vector-illustration.md # 矢量插画（教育/培训）
 ```
 
-## 🚀 使用方法
-
-### 在 Claude Code 中调用
-
-```bash
-/ppt-generator-pro
-```
-
-或直接告诉 Claude：
-
-```
-我想基于以下文档生成一个 5 页的 PPT，使用渐变毛玻璃风格。
-
-[文档内容...]
-```
-
-## 📝 Skill 执行流程
-
-### 阶段 1: 收集用户输入
-
-#### 1.1 获取文档内容
-
-**选项 A: 文档路径**
-```
-用户: 基于 my-document.md 生成 PPT
-→ 使用 Read 工具读取文件内容
-```
-
-**选项 B: 直接文本**
-```
-用户: 我想生成一个关于 AI 产品设计的 PPT
-主要内容：
-1. 现状分析
-2. 设计原则
-3. 案例研究
-```
-
-**选项 C: 主动询问**
-```
-如果用户未提供内容，询问：
-"请提供文档路径或直接粘贴文档内容"
-```
-
-#### 1.2 选择风格
-
-扫描 `styles/` 目录，列出可用风格：
+**Agent 代码示例：**
 
 ```python
-# 自动检测风格文件
-styles = ['gradient-glass.md', 'vector-illustration.md']
+# 扫描可用风格
+styles_dir = "assets/styles/"
+available_styles = [f.stem for f in Path(styles_dir).glob("*.md")]
+
+# 如果有多个风格，询问用户
+if len(available_styles) > 1:
+    # 使用 question 工具让用户选择
+    ...
+else:
+    style = available_styles[0]
 ```
 
-**如果有多个风格，使用 AskUserQuestion：**
+---
 
-```markdown
-问题: 请选择 PPT 风格
-选项:
-- 渐变毛玻璃卡片风格（科技感、商务演示）
-- 矢量插画风格（温暖、教育培训）
-```
+### 阶段 3: 内容规划
 
-#### 1.3 选择页数范围
+**根据页数推荐结构：**
 
-使用 AskUserQuestion 询问：
+| 页数 | 推荐结构 |
+|------|----------|
+| 5页 | 封面 → 要点1 → 要点2 → 要点3 → 总结 |
+| 5-10页 | 封面 → 引言(1-2) → 核心(4-5) → 案例(1-2) → 总结 |
+| 10-15页 | 封面 → 目录 → 章节(每章3页) → 数据 → 总结 |
+| 20-25页 | 封面 → 目录 → 引言 → 章节(每章4页) → 案例研究 → 数据 → 总结 |
 
-```markdown
-问题: 希望生成多少页 PPT？
-选项:
-- 5 页（5 分钟演讲）
-- 5-10 页（10-15 分钟演讲）
-- 10-15 页（20-30 分钟演讲）
-- 20-25 页（45-60 分钟演讲）
-```
-
-#### 1.4 选择分辨率
-
-```markdown
-问题: 选择图片分辨率
-选项:
-- 2K (2752x1536) - 推荐，快速生成
-- 4K (5504x3072) - 高质量，适合打印
-```
-
-#### 1.5 是否生成视频（可选）
-
-如果配置了可灵 AI 密钥，询问：
-
-```markdown
-问题: 是否生成转场视频？
-选项:
-- 仅图片（快速）
-- 图片 + 转场视频（完整体验）
-```
-
-### 阶段 2: 文档分析与内容规划
-
-#### 2.1 内容规划策略
-
-根据页数范围，智能规划每一页内容：
-
-**5 页版本：**
-1. 封面：标题 + 核心主题
-2. 要点 1：第一个核心观点
-3. 要点 2：第二个核心观点
-4. 要点 3：第三个核心观点
-5. 总结：核心结论或行动建议
-
-**5-10 页版本：**
-1. 封面
-2-3. 引言/背景
-4-7. 核心内容（3-4 个关键观点）
-8-9. 案例或数据支持
-10. 总结与行动建议
-
-**10-15 页版本：**
-1. 封面
-2-3. 引言/目录
-4-6. 第一章节（3 页）
-7-9. 第二章节（3 页）
-10-12. 第三章节/案例研究
-13-14. 数据可视化
-15. 总结与下一步
-
-**20-25 页版本：**
-1. 封面
-2. 目录
-3-4. 引言和背景
-5-8. 第一部分（4 页）
-9-12. 第二部分（4 页）
-13-16. 第三部分（4 页）
-17-19. 案例研究
-20-22. 数据分析和洞察
-23-24. 关键发现和建议
-25. 总结与致谢
-
-#### 2.2 生成 slides_plan.json
-
-创建 JSON 文件：
+**生成规划文件：**
 
 ```json
 {
-  "title": "文档标题",
+  "title": "PPT标题",
   "total_slides": 5,
+  "style": "渐变毛玻璃卡片风格",
+  "resolution": "2K",
   "slides": [
     {
       "slide_number": 1,
       "page_type": "cover",
-      "content": "标题：AI 产品设计指南\n副标题：构建以用户为中心的智能体验"
+      "content": "标题：...\n副标题：..."
     },
-    {
-      "slide_number": 2,
-      "page_type": "content",
-      "content": "核心原则\n- 简单直观\n- 快速响应\n- 透明可控"
-    },
-    {
-      "slide_number": 3,
-      "page_type": "content",
-      "content": "设计流程\n1. 用户研究\n2. 原型设计\n3. 测试迭代"
-    },
-    {
-      "slide_number": 4,
-      "page_type": "data",
-      "content": "用户满意度\n使用前：65%\n使用后：92%\n提升：+27%"
-    },
-    {
-      "slide_number": 5,
-      "page_type": "content",
-      "content": "总结\n- 以用户为中心\n- 持续优化迭代\n- 数据驱动决策"
-    }
+    ...
   ]
 }
 ```
 
-**重要：** 将此文件保存到：
-- 独立使用：`./slides_plan.json`
-- Skill 模式：`.claude/skills/ppt-generator/slides_plan.json`
+**保存位置：** `test_slides.json` 或用户指定路径
 
-### 阶段 3: 生成 PPT 图片
+---
 
-#### 3.1 确定工作目录
+### 阶段 4: 生成 PPT 图片
 
-**独立模式：**
-```bash
-cd /path/to/ppt-generator
-```
-
-**Skill 模式：**
-```bash
-cd ~/.claude/skills/ppt-generator
-```
-
-#### 3.2 执行生成命令
+**调用命令：**
 
 ```bash
-python generate_ppt.py \
-  --plan slides_plan.json \
-  --style styles/gradient-glass.md \
-  --resolution 2K
-```
-
-**或使用 uv run（推荐）：**
-```bash
-uv run python generate_ppt.py \
-  --plan slides_plan.json \
-  --style styles/gradient-glass.md \
-  --resolution 2K
+python scripts/generate_ppt.py \
+  --plan test_slides.json \
+  --style assets/styles/vector-illustration.md \
+  --resolution 4K
 ```
 
 **参数说明：**
-- `--plan`: slides 规划 JSON 文件路径
-- `--style`: 风格文件路径
-- `--resolution`: 分辨率（2K 或 4K）
-- `--template`: HTML 模板路径（可选）
 
-#### 3.3 监控生成进度
+| 参数 | 必需 | 说明 |
+|------|------|------|
+| `--plan` | ✅ | JSON 规划文件路径 |
+| `--style` | ✅ | 风格文件路径 |
+| `--resolution` | ❌ | 2K 或 4K，默认 **4K** |
+| `--output` | ❌ | 输出目录，默认 `outputs/YYYYMMDD_HHMMSS/` |
+| `--draft` | ❌ | 草稿模式（快速生成） |
 
-脚本会输出进度信息：
+**时间预估：**
+- 2K 分辨率：~30 秒/页
+- 4K 分辨率：~60 秒/页
+- 5 页 PPT：约 2.5 分钟
 
+**成功输出：**
 ```
-✅ 已加载环境变量: /path/to/.env
-📊 开始生成 PPT 图片...
-   总页数: 5
-   分辨率: 2K (2752x1536)
-   风格: 渐变毛玻璃卡片风格
-
-🎨 生成第 1 页 (封面页)...
-   提示词已生成
-   调用 Nano Banana Pro API...
-   ✅ 第 1 页生成成功 (32.5 秒)
-
-🎨 生成第 2 页 (内容页)...
-   ✅ 第 2 页生成成功 (28.3 秒)
-
-...
-
-✅ 所有页面生成完成！
-📁 输出目录: outputs/20260112_143022/
+outputs/YYYYMMDD_HHMMSS/
+├── images/
+│   ├── slide-01.png
+│   ├── slide-02.png
+│   ├── slide-03.png
+│   ├── slide-04.png
+│   └── slide-05.png
+├── index.html          # 图片播放器
+└── prompts.json        # 提示词记录（调试用）
 ```
 
-### 阶段 4: 生成转场提示词（视频模式需要）
+**注意：** 输出目录自动使用时间戳命名，每次生成独立保存，不会覆盖之前的结果。
 
-**这是 Skill 的核心优势**：我（Claude Code）会分析生成的 PPT 图片，为每个转场生成精准的视频提示词。
+**错误处理：**
 
-#### 4.1 读取并分析 PPT 图片
+| 错误 | 原因 | 解决方案 |
+|------|------|----------|
+| `RH_API_KEY 未配置` | .env 缺少 Key | 告诉用户配置 Key |
+| `API 余额不足` | 账户余额为0 | 告诉用户充值 |
+| `生成超时` | 网络或API问题 | 稍后重试 |
+| `模型不可用` | 模型维护中 | 更换模型参数 |
 
-我会读取所有生成的图片：
+---
 
-```python
-# 自动读取输出目录中的所有图片
-slides = ['slide-01.png', 'slide-02.png', ...]
-```
+### 阶段 5: 生成转场视频（可选）
 
-#### 4.2 分析图片差异并生成提示词
+**判断是否需要：**
+- 用户明确要求视频
+- 用户问答中选择"生成视频"
 
-对于每对相邻图片，我会：
-1. **视觉分析**：理解两张图片的布局、元素、色彩差异
-2. **生成预览提示词**：为首页创建可循环的微动效描述
-3. **生成转场提示词**：详细描述如何从起始帧过渡到结束帧
+**前提条件：**
+- ✅ PPT 图片已生成
+- ✅ FFmpeg 已安装
+- ✅ RH_API_KEY 有余额（视频生成需要更多费用）
 
-**示例输出：**
+**工作流程：**
+
+#### 5.1 分析图片生成转场提示词
+
+**Agent 任务：**
+1. 读取所有生成的 PPT 图片
+2. 分析每对相邻图片的视觉差异
+3. 为每个转场生成精准的视频提示词
+
+**提示词模板（保存在 `transition_prompts.json`）：**
+
 ```json
 {
   "preview": {
-    "slide_path": "outputs/.../slide-01.png",
-    "prompt": "画面保持封面的静态构图，中心的3D玻璃环缓慢旋转..."
+    "prompt": "首页循环预览动画：[描述封面页的动态效果]"
   },
   "transitions": [
     {
       "from_slide": 1,
       "to_slide": 2,
-      "prompt": "镜头从封面开始，玻璃环逐渐解构，分裂成透明碎片..."
-    }
+      "prompt": "从封面过渡到内容页：[描述转场动画]"
+    },
+    ...
   ]
 }
 ```
 
-#### 4.3 保存提示词文件
+**转场提示词写作要点：**
+- 描述起始帧到结束帧的**动态过渡**
+- 保持风格一致（渐变毛玻璃 / 矢量插画）
+- 控制在 50-100 字
+- 避免提到文字（视频模型可能模糊文字）
 
-我会将生成的提示词保存到：
-```
-outputs/TIMESTAMP/transition_prompts.json
-```
-
-**关键优势：**
-- ✅ 不需要单独的 Claude API 密钥
-- ✅ 提示词针对实际图片内容定制
-- ✅ 考虑文字稳定性，避免视频模型弄模糊文字
-- ✅ 符合渐变毛玻璃风格的视觉语言
-
-### 阶段 5: 生成转场视频（可选）
-
-如果用户选择生成视频，使用阶段 4 生成的提示词文件：
+#### 5.2 调用视频生成命令
 
 ```bash
-python generate_ppt_video.py \
-  --slides-dir outputs/20260112_143022/images \
-  --output-dir outputs/20260112_143022_video \
-  --prompts-file outputs/20260112_143022/transition_prompts.json
+python scripts/generate_ppt_video.py \
+  --slides-dir outputs/YYYYMMDD_HHMMSS/images/ \
+  --output-dir outputs/YYYYMMDD_HHMMSS_video/ \
+  --prompts-file outputs/YYYYMMDD_HHMMSS/transition_prompts.json \
+  --video-provider enterprise-video \
+  --enterprise-model x-low
 ```
 
-**生成内容：**
-- 首页循环预览视频（`preview.mp4`）
-- 页面间转场视频（`transition_01_to_02.mp4` 等）
-- 交互式视频播放器（`video_index.html`）
-- 完整视频（`full_ppt_video.mp4`）
+**视频提供者选择：**
 
-### 阶段 6: 返回结果
+| 提供者 | 参数 | 特点 | 成本 |
+|--------|------|------|------|
+| 全能视频X低价版 | `--enterprise-model x-low` | 最便宜，支持多图参考 | 💰 低 |
+| 全能视频V3.1-pro | `--enterprise-model v3.1-pro` | 支持4K，首尾帧模式 | 💰💰 中 |
+| Seedance 2.0 | `--video-provider seedance` | 创作级Key，4-15秒 | 💰💰💰 高 |
 
-#### 6.1 仅图片模式
+**时间预估：**
+- 每段转场视频：~90-120 秒
+- 5 页 PPT（4 段转场）：~6-8 分钟
+- 视频合成：~10 秒
 
+**成功输出：**
 ```
-✅ PPT 生成成功！
-
-📁 输出目录: outputs/20260112_143022/
-🖼️ PPT 图片: outputs/20260112_143022/images/
-🎬 播放网页: outputs/20260112_143022/index.html
-
-打开播放网页:
-open outputs/20260112_143022/index.html
-
-播放器快捷键:
-- ← → 键: 切换页面
-- ↑ Home: 回到首页
-- ↓ End: 跳到末页
-- 空格: 暂停/继续自动播放
-- ESC: 全屏切换
-- H: 隐藏/显示控件
-```
-
-#### 5.2 视频模式
-
-```
-✅ PPT 视频生成成功！
-
-📁 输出目录: outputs/20260112_143022_video/
-🖼️ PPT 图片: outputs/20260112_143022/images/
-🎬 转场视频: outputs/20260112_143022_video/videos/
-🎮 交互式播放器: outputs/20260112_143022_video/video_index.html
-🎥 完整视频: outputs/20260112_143022_video/full_ppt_video.mp4
-
-打开交互式播放器:
-open outputs/20260112_143022_video/video_index.html
-
-播放逻辑:
-1. 首页: 播放循环预览视频
-2. 按右键 → 播放转场视频 → 显示目标页图片（2 秒）
-3. 再按右键 → 播放下一个转场 → 显示下一页图片
-4. 依此类推...
-
-视频播放器快捷键:
-- ← → 键: 上一页/下一页（含转场）
-- 空格: 播放/暂停当前视频
-- ESC: 全屏切换
-- H: 隐藏/显示控件
-```
-
-## 🔧 环境变量配置
-
-### .env 文件位置
-
-Skill 会按以下顺序查找 `.env` 文件：
-
-1. **脚本所在目录** - `./ppt-generator/.env`
-2. **向上查找项目根目录** - 直到找到包含 `.git` 或 `.env` 的目录
-3. **Claude Skill 标准位置** - `~/.claude/skills/ppt-generator/.env`
-4. **系统环境变量** - 如果以上都未找到
-
-### .env 文件示例
-
-```bash
-# Google AI API 密钥（必需）
-GEMINI_API_KEY=your_gemini_api_key_here
-
-# 可灵 AI API 密钥（可选，用于视频功能）
-KLING_ACCESS_KEY=your_kling_access_key_here
-KLING_SECRET_KEY=your_kling_secret_key_here
-```
-
-## ⚠️ 错误处理
-
-### 常见错误及解决方案
-
-**1. API 密钥未设置**
-```
-错误: ⚠️ 未找到 .env 文件，尝试使用系统环境变量
-      未设置 GEMINI_API_KEY 环境变量
-
-解决:
-1. 创建 .env 文件
-2. 添加 GEMINI_API_KEY=your_key_here
-```
-
-**2. Python 依赖缺失**
-```
-错误: ModuleNotFoundError: No module named 'google.genai'
-
-解决: pip install google-genai pillow python-dotenv
-```
-
-**3. FFmpeg 未安装**
-```
-错误: ❌ FFmpeg 不可用！
-
-解决: brew install ffmpeg  # macOS
-      sudo apt-get install ffmpeg  # Ubuntu
-```
-
-**4. API 调用失败**
-```
-错误: API 调用超时或失败
-
-解决:
-1. 检查网络连接
-2. 确认 API 密钥有效
-3. 稍后重试
-```
-
-**5. 视频生成失败**
-```
-错误: 可灵 AI 密钥未配置
-
-解决:
-1. 如果只需要图片，跳过视频生成步骤
-2. 如果需要视频，配置 KLING_ACCESS_KEY 和 KLING_SECRET_KEY
-```
-
-## 🎨 风格系统
-
-### 已内置风格
-
-#### 1. 渐变毛玻璃卡片风格 (`gradient-glass.md`)
-
-**视觉特点：**
-- Apple Keynote 极简主义
-- 玻璃拟态效果
-- 霓虹紫/电光蓝/珊瑚橙渐变
-- 3D 玻璃物体 + 电影级光照
-
-**适用场景：**
-- 科技产品发布
-- 商务演示
-- 数据报告
-- 企业品牌展示
-
-#### 2. 矢量插画风格 (`vector-illustration.md`)
-
-**视觉特点：**
-- 扁平化矢量设计
-- 统一黑色轮廓线
-- 复古柔和配色
-- 几何化简化
-
-**适用场景：**
-- 教育培训
-- 创意提案
-- 儿童相关
-- 温暖品牌故事
-
-### 添加自定义风格
-
-1. 在 `styles/` 目录创建新的 `.md` 文件
-2. 按照现有风格格式编写
-3. Skill 会自动识别并提供选择
-
-## 📊 技术细节
-
-### API 配置
-
-**Nano Banana Pro（图片生成）：**
-- 模型：`gemini-3-pro-image-preview`
-- 比例：`16:9`
-- 响应模式：`IMAGE`
-- 分辨率：2K (2752x1536) 或 4K (5504x3072)
-
-**可灵 AI（视频生成）：**
-- 模式：专业模式（professional）
-- 时长：5 秒
-- 分辨率：1920x1080
-- 帧率：24fps
-
-**FFmpeg（视频合成）：**
-- 编码：H.264
-- 质量：CRF 23
-- 帧率：24fps（统一）
-- 分辨率：1920x1080（统一）
-
-### 性能指标
-
-**生成速度：**
-- PPT 图片：~30 秒/页（2K）| ~60 秒/页（4K）
-- 转场视频：~30-60 秒/段
-- 视频合成：~5-10 秒
-
-**文件大小：**
-- PPT 图片：~2.5MB/页（2K）| ~8MB/页（4K）
-- 转场视频：~3-5MB/段（1080p，5 秒）
-- 完整视频：~12-20MB（5 页 PPT + 转场）
-
-## 📁 文件组织
-
-### 输出目录结构
-
-**仅图片模式：**
-```
-outputs/20260112_143022/
-├── images/
-│   ├── slide-01.png
-│   ├── slide-02.png
-│   └── ...
-├── index.html          # 图片播放器
-└── prompts.json        # 提示词记录
-```
-
-**视频模式：**
-```
-outputs/20260112_143022_video/
+outputs/YYYYMMDD_HHMMSS_video/
 ├── videos/
-│   ├── preview.mp4              # 首页循环预览
-│   ├── transition_01_to_02.mp4
+│   ├── preview.mp4              # 首页预览
+│   ├── transition_01_to_02.mp4  # 转场视频
 │   ├── transition_02_to_03.mp4
-│   └── ...
-├── video_index.html             # 交互式播放器
+│   ├── transition_03_to_04.mp4
+│   └── transition_04_to_05.mp4
+├── video_index.html             # 交互播放器
 └── full_ppt_video.mp4           # 完整视频
 ```
 
-## 🎯 最佳实践
+---
 
-1. **文档质量**：输入文档内容越清晰结构化，生成的 PPT 质量越高
-2. **页数选择**：根据文档长度和演示场景合理选择页数
-3. **分辨率选择**：日常使用推荐 2K，重要展示场合可选 4K
-4. **视频功能**：首次使用建议先尝试仅图片模式，熟悉后再使用视频功能
-5. **提示词调整**：查看 `prompts.json` 了解生成逻辑，可手动调整后重新生成
+### 阶段 6: 返回结果
 
-## 📝 使用示例
+**仅图片模式：**
 
-### 示例 1: 快速生成
-
-**用户输入：**
 ```
-我需要基于这份会议纪要生成一个 5 页的 PPT，使用矢量插画风格。
+✅ PPT 图片生成完成！
 
-会议主题：Q1 产品路线图规划
-参与人：产品团队
+📁 输出目录: outputs/YYYYMMDD_HHMMSS/
+🖼️ PPT 图片: outputs/YYYYMMDD_HHMMSS/images/slide-*.png
+🎬 播放网页: outputs/YYYYMMDD_HHMMSS/index.html
 
-讨论内容：
-1. 用户反馈汇总
-2. 新功能优先级
-3. 技术可行性评估
-4. Q1 里程碑
-5. 下一步行动项
+打开播放器:
+  open outputs/YYYYMMDD_HHMMSS/index.html
+
+播放器快捷键:
+  ← → : 切换页面
+  ESC : 全屏切换
+  空格 : 自动播放
 ```
 
-**Skill 执行：**
-1. 收集输入（已提供内容）
-2. 确认风格（矢量插画）
-3. 确认页数（5 页）
-4. 确认分辨率（询问用户）
-5. 生成 slides_plan.json
-6. 执行生成命令
-7. 返回结果
+**视频模式：**
 
-### 示例 2: 完整流程
-
-**用户输入：**
 ```
-基于 AI-Product-Design.md 文档，生成一个 15 页的 PPT，使用渐变毛玻璃风格，需要转场视频。
+✅ PPT 动态视频生成完成！
+
+📁 输出目录: outputs/YYYYMMDD_HHMMSS_video/
+🖼️ PPT 图片: outputs/YYYYMMDD_HHMMSS/images/
+🎬 转场视频: outputs/YYYYMMDD_HHMMSS_video/videos/
+🎮 交互播放器: outputs/YYYYMMDD_HHMMSS_video/video_index.html
+🎥 完整视频: outputs/YYYYMMDD_HHMMSS_video/full_ppt_video.mp4
+
+打开播放器:
+  open outputs/YYYYMMDD_HHMMSS_video/video_index.html
+
+打开完整视频:
+  open outputs/YYYYMMDD_HHMMSS_video/full_ppt_video.mp4
+
+视频结构:
+  首页预览 → 转场1→2 → 静态页2(3秒) → 转场2→3 → ...
 ```
 
-**Skill 执行：**
-1. 读取文档内容
-2. 确认风格（渐变毛玻璃）
-3. 确认页数（15 页）
-4. 确认分辨率（询问用户）
-5. 确认生成视频（是）
-6. 分析文档，规划 15 页内容
-7. 生成 slides_plan.json
-8. 生成 PPT 图片
-9. 生成转场视频
-10. 合成完整视频
-11. 返回所有结果
+---
 
-## 🔄 更新日志
+## 💰 成本与时间预估
 
-### v2.0.0 (2026-01-12)
+### RunningHub 计费说明
 
-- 🎬 **新增视频功能**
-  - 可灵 AI 转场视频生成
-  - 交互式视频播放器
-  - FFmpeg 完整视频合成
-  - 首页循环预览视频
-- 🔧 **优化视频合成**
-  - 自动统一分辨率和帧率
-  - 修复视频拼接兼容性问题
-  - 静态图片展示时间改为 2 秒
-- 🔑 **改进环境变量**
-  - 智能查找 .env 文件
-  - 支持多种部署模式
-  - 自动向上查找项目根目录
-- 📚 **文档完善**
-  - 重命名为 SKILL.md（符合官方规范）
-  - 更新所有路径和命令
-  - 添加视频功能使用指南
+**账户状态检查：**
+- 注册即获得普通会员 Key
+- 企业共享 Key 需充值余额
+- 按生成次数计费
 
-### v1.0.0 (2026-01-09)
+**成本预估（仅供参考）：**
 
-- ✨ 首次发布
-- 🎨 内置 2 种专业风格
-- 🖼️ 支持 2K/4K 分辨率
-- 🎬 HTML5 图片播放器
-- 📊 智能文档分析
+| 操作 | 模型 | 预估成本 | 时间 |
+|------|------|----------|------|
+| PPT 图片生成 | 全能图片PRO | ~0.1元/页 | 30秒/页 |
+| 转场视频 | 全能视频X低价 | ~0.2元/段 | 90秒/段 |
+| 转场视频 | 全能视频V3.1 | ~0.5元/段 | 90秒/段 |
 
-## 📄 许可证
+**Agent 提示用户：**
+- "5 页 PPT（仅图片）：约 0.5 元，2 分钟"
+- "5 页 PPT（含视频）：约 1.5 元，8 分钟"
 
-MIT License
+---
+
+## ⚠️ 错误处理指南
+
+### 常见错误及 Agent 应对
+
+| 错误信息 | Agent 行动 |
+|----------|-----------|
+| `RH_API_KEY 未配置` | 告诉用户："请先配置 RH_API_KEY，获取地址：https://www.runninghub.cn" |
+| `API 余额不足` | 告诉用户："账户余额不足，请充值后重试" |
+| `生成超时` | 重试 1 次，若仍失败请用户稍后再试 |
+| `图片内容违规` | 告诉用户："内容可能触发审核，请修改后重试" |
+| `FFmpeg 未安装` | 仅图片模式可用，视频功能需安装 FFmpeg |
+| `视频生成失败` | 检查 Key 余额，提示用户可能需要充值 |
+
+### 错误处理代码示例
+
+```python
+try:
+    result = subprocess.run(cmd, capture_output=True, timeout=300)
+    if result.returncode != 0:
+        error_msg = result.stderr.decode()
+        
+        if "余额不足" in error_msg or "INSUFFICIENT_FUNDS" in error_msg:
+            print("❌ RunningHub 账户余额不足")
+            print("请充值后重试：https://www.runninghub.cn")
+            return None
+            
+        elif "API_KEY" in error_msg:
+            print("❌ RH_API_KEY 未配置或无效")
+            print("请检查 .env 文件中的 RH_API_KEY")
+            return None
+            
+        else:
+            print(f"❌ 生成失败: {error_msg}")
+            return None
+            
+except subprocess.TimeoutExpired:
+    print("⏳ 生成超时，正在重试...")
+    # 重试逻辑
+```
+
+---
+
+## 📁 输出文件说明
+
+**注意：** 所有输出使用时间戳目录命名，每次生成独立保存，不会覆盖之前结果。
+
+### 图片模式输出
+
+```
+outputs/YYYYMMDD_HHMMSS/
+├── images/
+│   ├── slide-01.png          # 第1页图片
+│   ├── slide-02.png          # 第2页图片
+│   └── ...
+├── index.html                # 图片播放器
+└── prompts.json              # 提示词记录（调试用）
+```
+
+### 视频模式输出
+
+```
+outputs/YYYYMMDD_HHMMSS_video/
+├── videos/                   # 视频素材
+│   ├── preview.mp4           # 首页预览（可选）
+│   ├── transition_01_to_02.mp4
+│   ├── transition_02_to_03.mp4
+│   └── ...
+├── video_index.html          # 交互播放器
+└── full_ppt_video.mp4        # 完整视频
+```
+
+### 目录命名规则
+
+- **图片输出**: `outputs/YYYYMMDD_HHMMSS/` (如 `outputs/20260404_221500/`)
+- **视频输出**: `outputs/YYYYMMDD_HHMMSS_video/` (如 `outputs/20260404_221500_video/`)
+- 时间戳格式：年月日_时分秒
+- 原始图片保存在 `_video` 版本的 `images/` 子目录中
+
+### ⚠️ 产出物存储提醒（重要！）
+
+**生成完成后，Agent 应立即提醒用户保存产出物：**
+
+```
+✅ 项目完成！
+
+⚠️ 重要提醒：
+产出物已保存在 outputs/YYYYMMDD_HHMMSS/ 目录
+- 图片总大小：~30-50MB（5页 4K）
+- 视频总大小：~10-20MB（4段转场 + 合成）
+
+请尽快将产出物保存到：
+- 云盘（Google Drive / 百度网盘 / OneDrive）
+- 本地永久存储
+- 或下载到用户设备
+
+服务器存储空间有限，定期清理可避免空间堵塞。
+```
+
+**清理命令（用户确认后执行）：**
+```bash
+# 清理指定时间戳目录
+rm -rf outputs/YYYYMMDD_HHMMSS*
+```
+
+---
+
+## 🎯 最佳实践（Agent 注意事项）
+
+### 时间管理
+
+| 内容量 | 页数 | 仅图片 | 含视频 |
+|--------|------|--------|--------|
+| 少量 | 5页 | ~2分钟 | ~8分钟 |
+| 中等 | 10页 | ~4分钟 | ~15分钟 |
+| 大量 | 20页 | ~8分钟 | ~30分钟 |
+
+**Agent 提示：**
+- 超过 10 页 → 提示用户"内容较多，可能需要等待较长时间"
+- 需要视频 → 提示用户"视频生成需要额外等待"
+
+### 成本控制
+
+- 默认使用低价模型（全能视频X低价版）
+- 用户要求高质量时推荐 V3.1-pro
+- 明确告知预估成本
+
+### 质量控制
+
+- 内容规划时检查每页字数（建议 50-150 字）
+- 避免单页内容过多
+- 封面页保持简洁
+
+### 存储空间管理
+
+**关键提醒：**
+- 服务器存储空间有限
+- 每次 PPT+视频生成约 50-100MB
+- **项目完成后必须提醒用户保存并清理**
+- 建议用户将产出物转移至云盘或本地永久存储
+
+---
+
+## 🔄 版本历史
+
+### v2.1.0 (当前)
+
+- 🔄 **平台迁移**：从 Gemini/可灵 迁移到 RunningHub
+- 💰 **成本优化**：使用全能视频X低价版
+- 🎬 **视频提供者**：支持多种视频模型选择
+- 📝 **SKILL 重构**：针对 Agent 执行优化
+
+### v2.0.0
+
+- 🎬 新增视频功能
+- 🎞️ 智能转场
+- 🔧 参数统一
+
+---
 
 ## 📞 技术支持
 
-- 项目架构：参见 `ARCHITECTURE.md`
-- API 管理：参见 `API_MANAGEMENT.md`
-- 环境配置：参见 `ENV_SETUP.md`
-- 安全说明：参见 `SECURITY.md`
-- 完整文档：参见 `README.md`
+- API 文档：`API_MANAGEMENT.md`
+- 环境配置：`ENV_SETUP.md`
+- 架构说明：`ARCHITECTURE.md`
+- 快速开始：`QUICKSTART.md`
+
+---
+
+**Agent 执行原则：**
+1. ✅ 先检查环境，再执行
+2. ✅ 明确告知用户时间和成本
+3. ✅ 错误时提供具体解决方案
+4. ✅ 返回结果时包含打开方式
+5. ✅ 视频功能需要确认 FFmpeg 和余额

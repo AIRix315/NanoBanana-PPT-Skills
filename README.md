@@ -1,20 +1,136 @@
 # RH-PPT-Skills
 
-> 基于 AI 自动生成高质量 PPT 图片和视频的强大工具，支持 RunningHub API 和多模型切换
+> 从文档到动态视频演示，一站式 PPT 生成工具 | RunningHub API
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 
-**原作者**: [歸藏](https://github.com/op7418) | **重构**: RunningHub API 适配
-
-[效果演示](#-效果演示) • [功能特性](#-功能特性) • [平台选择](#-平台选择) • [一键安装](#-一键安装) • [使用指南](#-使用指南) • [常见问题](#-常见问题)
+**一个 Key，完成所有功能** | [快速开始](#-快速开始) | [详细文档](./QUICKSTART.md)
 
 </div>
 
 ---
+
+## 🚀 快速开始
+
+### 第一步：获取 Key
+
+访问 https://www.runninghub.cn 注册并获取 API Key
+
+### 第二步：配置
+
+```bash
+# 克隆项目
+git clone https://github.com/AIRix315/RH-PPT-Skills.git
+cd RH-PPT-Skills
+
+# 配置 Key
+cp .env.example .env
+# 编辑 .env，填入：RH_API_KEY=your-api-key
+
+# 安装依赖
+pip install requests pillow python-dotenv
+
+# 视频功能需要 FFmpeg
+brew install ffmpeg  # macOS
+sudo apt install ffmpeg  # Linux
+```
+
+### 第三步：使用
+
+**在 OpenCode/OpenClaw 中直接说：**
+
+> "帮我生成一个关于《AI产品设计原则》的 5 页 PPT，使用渐变毛玻璃风格，需要动态视频"
+
+**或命令行：**
+
+```bash
+# 生成 PPT 图片（默认 4K 分辨率）
+python scripts/generate_ppt.py --plan slides.json --style assets/styles/gradient-glass.md
+
+# 生成动态视频（可选）
+python scripts/generate_ppt_video.py \
+  --slides-dir outputs/YYYYMMDD_HHMMSS/images \
+  --output-dir outputs/YYYYMMDD_HHMMSS_video \
+  --prompts-file outputs/YYYYMMDD_HHMMSS/transition_prompts.json \
+  --video-provider enterprise-video \
+  --enterprise-model x-low
+```
+
+---
+
+## 💰 成本预估
+
+| 内容 | 成本 | 时间 |
+|------|------|------|
+| 5页 PPT（仅图片） | ~¥0.5 | ~2分钟 |
+| 5页 PPT（含视频） | ~¥1.5 | ~8分钟 |
+| 10页 PPT（含视频） | ~¥3 | ~15分钟 |
+
+**使用全能视频X低价版最实惠！**
+
+---
+
+## 🎬 视频提供者选择
+
+| 提供者 | 命令参数 | 成本 | 推荐 |
+|--------|----------|------|------|
+| 全能视频X低价版 | `--enterprise-model x-low` | 💰 | ✅ 默认推荐 |
+| 全能视频V3.1-pro | `--enterprise-model v3.1-pro` | 💰💰 | 高质量需求 |
+
+---
+
+## 📖 详细文档
+
+### 核心文档
+
+| 文档 | 说明 | 受众 |
+|------|------|------|
+| [SKILL.md](./SKILL.md) | Agent 执行指南 | 🤖 Agent |
+| [references/QUICKSTART.md](./references/QUICKSTART.md) | 5 分钟快速开始 | 👤 用户 |
+| [references/API_MANAGEMENT.md](./references/API_MANAGEMENT.md) | API 密钥配置 | 👤 用户 |
+| [references/ARCHITECTURE.md](./references/ARCHITECTURE.md) | 技术架构 | 👤 开发者 |
+| [references/SECURITY.md](./references/SECURITY.md) | 安全最佳实践 | 👤 开发者 |
+
+---
+
+## 📁 项目结构
+
+```
+RH-PPT-Skills/
+├── SKILL.md                    # Agent 执行指南（核心文件）
+├── README.md                   # 项目说明
+├── .env.example                # 环境变量模板
+├── requirements.txt            # Python 依赖
+│
+├── scripts/                    # 核心脚本
+│   ├── generate_ppt.py         # PPT 图片生成
+│   ├── generate_ppt_video.py   # 视频生成
+│   ├── rh_api.py               # RunningHub API
+│   ├── video_composer.py       # FFmpeg 合成
+│   └── ...                     # 其他脚本
+│
+├── assets/                     # 资源文件
+│   ├── styles/                 # 视觉风格
+│   ├── templates/              # HTML 模板
+│   └── prompts/                # 提示词模板
+│
+├── references/                 # 参考文档
+│   ├── QUICKSTART.md          # 快速开始
+│   ├── ARCHITECTURE.md        # 架构说明
+│   └── ...                    # 其他文档
+│
+├── tests/                      # 测试文件
+│
+├── OpenCode/                   # OpenCode 平台适配
+│   └── skills/rh-ppt-skill/
+│
+└── OpenClaw/                   # OpenClaw 平台适配
+    └── skills/rh-ppt-skill/
+```
 
 ## 🎯 平台选择
 

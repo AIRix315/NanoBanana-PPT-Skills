@@ -42,10 +42,10 @@ pip install requests pillow python-dotenv
 
 ```bash
 # 基本测试
-python generate_ppt.py --plan test/slides.json --style styles/gradient-glass.md --draft
+python scripts/generate_ppt.py --plan test/slides.json --style assets/styles/gradient-glass.md --draft
 
 # 完整测试
-python generate_ppt.py --plan test/slides.json --style styles/gradient-glass.md --model pro
+python scripts/generate_ppt.py --plan test/slides.json --style assets/styles/gradient-glass.md --model pro
 ```
 
 ### 4. 验证输出
@@ -60,14 +60,14 @@ python generate_ppt.py --plan test/slides.json --style styles/gradient-glass.md 
 
 ```bash
 # 使用草稿模式快速验证
-python generate_ppt.py --plan test/slides.json --style styles/gradient-glass.md --draft --model v2
+python scripts/generate_ppt.py --plan test/slides.json --style assets/styles/gradient-glass.md --draft --model v2
 ```
 
 ### 完整验证
 
 ```bash
 # 使用 PRO 模型完整验证
-python generate_ppt.py --plan test/slides.json --style styles/gradient-glass.md --model pro
+python scripts/generate_ppt.py --plan test/slides.json --style assets/styles/gradient-glass.md --model pro
 ```
 
 ## 常见问题

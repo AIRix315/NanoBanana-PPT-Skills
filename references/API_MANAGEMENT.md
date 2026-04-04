@@ -22,7 +22,7 @@
 **无需任何额外配置！** 直接使用即可：
 
 ```bash
-./run.sh --plan slides_plan.json --style styles/gradient-glass.md --resolution 2K
+./run.sh --plan slides_plan.json --style assets/styles/gradient-glass.md --resolution 2K
 ```
 
 输出显示：

@@ -44,7 +44,7 @@ pip install requests pillow python-dotenv
 
 ```bash
 # crontab 示例
-0 9 * * * cd /path/to/RH-PPT-Skills && python generate_ppt.py --plan daily/slides.json --style styles/gradient-glass.md --model pro
+0 9 * * * cd /path/to/RH-PPT-Skills && python scripts/generate_ppt.py --plan daily/slides.json --style assets/styles/gradient-glass.md --model pro
 ```
 
 ## 生产部署配置
@@ -68,8 +68,8 @@ KLING_SECRET_KEY=your-kling-secret-key
 ### 风格模板
 
 内置风格模板：
-- `styles/gradient-glass.md` - 渐变毛玻璃风格
-- `styles/vector-illustration.md` - 矢量插画风格
+- `assets/styles/gradient-glass.md` - 渐变毛玻璃风格
+- `assets/styles/vector-illustration.md` - 矢量插画风格
 
 自定义风格模板：参考现有模板格式，创建新的 `.md` 文件。
 
@@ -93,7 +93,7 @@ KLING_SECRET_KEY=your-kling-secret-key
 使用脚本批量生成多个 PPT：
 ```bash
 for plan in plans/*.json; do
-  python generate_ppt.py --plan "$plan" --style styles/gradient-glass.md --model pro
+  python scripts/generate_ppt.py --plan "$plan" --style assets/styles/gradient-glass.md --model pro
 done
 ```
 
@@ -101,7 +101,7 @@ done
 
 使用 GNU Parallel 或 xargs 并发生成：
 ```bash
-find plans/*.json | parallel -j 4 python generate_ppt.py --plan {} --style styles/gradient-glass.md --model pro
+find plans/*.json | parallel -j 4 python scripts/generate_ppt.py --plan {} --style assets/styles/gradient-glass.md --model pro
 ```
 
 ## 常见问题
