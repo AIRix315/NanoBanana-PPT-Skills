@@ -3,11 +3,16 @@
 Enterprise Video Provider - 企业级视频生成提供者 (RunningHub)
 
 支持 RunningHub 企业级视频生成API：
+- 全能视频V3.1-fast-首尾帧生视频-低价渠道版（推荐，~￥0.5/段）
+- 全能视频V3.1-pro-首尾帧生视频-官方稳定版（高质量，~￥1.4/段）
 - 全能视频X-图生视频-低价渠道版（支持多图参考，最多7张）
 - 全能视频X-图生视频-官方稳定版
-- 全能视频V3.1-pro-图生视频-官方稳定版（支持首尾帧）
 
 这些API使用企业级Key (RH_API_KEY)，适合批量生产。
+
+⚡ 推荐配置：
+- 默认使用 v3.1-fast（低价渠道版，适合调试和测试）
+- 用户明确要求高质量时使用 v3.1-pro
 """
 
 import os
@@ -66,49 +71,54 @@ class EnterpriseVideoProvider(VideoProvider):
 
     # RunningHub 企业级视频端点
     ENDPOINTS = {
+        "v3.1-fast": "/rhart-video-v3.1-fast/start-end-to-video",  # 全能视频V3.1-fast首尾帧（推荐）
+        "v3.1-pro": "/rhart-video-v3.1-pro-official/reference-to-video",  # 全能视频V3.1-pro官方稳定版
         "x-low": "/rhart-video-g/image-to-video",  # 全能视频X低价渠道版（支持多图）
         "x": "/rhart-video-g-official/image-to-video",  # 全能视频X官方稳定版
-        "v3.1-pro": "/rhart-video-v3.1-pro-official/image-to-video",  # 全能视频V3.1-pro
     }
 
     # 模型显示名称
     MODEL_NAMES = {
-        "x-low": "全能视频X-低价渠道版 (支持多图)",
-        "x": "全能视频X (官方稳定版)",
-        "v3.1-pro": "全能视频V3.1-pro (官方稳定版)",
+        "v3.1-fast": "全能视频V3.1-fast-首尾帧-低价渠道版（推荐，~￥0.5/段）",
+        "v3.1-pro": "全能视频V3.1-pro-官方稳定版（高质量，~￥1.4/段）",
+        "x-low": "全能视频X-低价渠道版（多图参考）",
+        "x": "全能视频X-官方稳定版",
     }
 
     # 默认配置
-    DEFAULT_MODEL = "x-low"  # 默认使用低价版（最实惠）
-    DEFAULT_RESOLUTION = "720p"
-    DEFAULT_DURATION = 6
+    DEFAULT_MODEL = "v3.1-fast"  # 默认使用低价渠道版（推荐）
+    DEFAULT_RESOLUTION = "1080p"  # 默认1080p，兼顾质量和成本
+    DEFAULT_DURATION = 8
     DEFAULT_ASPECT_RATIO = "16:9"
     DEFAULT_GENERATE_AUDIO = False
     DEFAULT_TIMEOUT = 600  # 10分钟
     POLL_INTERVAL = 5  # 轮询间隔
 
     # 支持的参数范围
-    SUPPORTED_MODELS = ["x-low", "x", "v3.1-pro"]
+    SUPPORTED_MODELS = ["v3.1-fast", "v3.1-pro", "x-low", "x"]
     SUPPORTED_RESOLUTIONS = {
+        "v3.1-fast": ["720p", "1080p", "4k"],
+        "v3.1-pro": ["720p", "1080p", "4k"],
         "x-low": ["480p", "720p"],
         "x": ["480p", "720p"],
-        "v3.1-pro": ["720p", "1080p", "4k"],
     }
     SUPPORTED_DURATIONS = {
+        "v3.1-fast": [8],  # 固定8秒
+        "v3.1-pro": [8],  # 固定8秒
         "x-low": list(range(6, 31)),  # 6-30秒
         "x": [6, 10],
-        "v3.1-pro": [4, 6, 8],
     }
     SUPPORTED_ASPECT_RATIOS = {
+        "v3.1-fast": ["16:9", "9:16"],
+        "v3.1-pro": ["16:9", "9:16"],
         "x-low": ["2:3", "3:2", "1:1", "16:9", "9:16"],
         "x": ["16:9", "9:16"],
-        "v3.1-pro": ["16:9", "9:16"],
     }
 
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "x-low",
+        model: str = "v3.1-fast",
     ):
         """
         初始化企业级视频提供者
@@ -116,9 +126,10 @@ class EnterpriseVideoProvider(VideoProvider):
         Args:
             api_key: RunningHub 企业级 API 密钥
             model: 模型类型
-                - "x-low": 全能视频X低价渠道版（默认，支持多图，最实惠）
+                - "v3.1-fast": 全能视频V3.1-fast首尾帧低价渠道版（默认推荐，~￥0.5/段）
+                - "v3.1-pro": 全能视频V3.1-pro官方稳定版（高质量，~￥1.4/段）
+                - "x-low": 全能视频X低价渠道版（支持多图）
                 - "x": 全能视频X官方稳定版
-                - "v3.1-pro": 全能视频V3.1-pro官方稳定版（支持首尾帧）
         """
         # 使用企业级Key（RH_API_KEY或RH_ENTERPRISE_KEY）
         self.api_key = (
@@ -177,18 +188,18 @@ class EnterpriseVideoProvider(VideoProvider):
         Args:
             image_start: 起始帧图片路径（必需）
             image_end: 结束帧图片路径（可选）
+                - 对于 v3.1-fast/v3.1-pro 模型：作为尾帧使用（首尾帧视频）
                 - 对于 x-low 模型：会添加到 imageUrls 数组实现多图过渡
-                - 对于 v3.1-pro 模型：作为尾帧使用
                 - 对于 x 模型：不支持，会被忽略
             prompt: 视频生成提示词
             output_path: 输出路径
             duration: 视频时长（秒）
+                - 全能视频V3.1-fast/pro: 固定8秒
                 - 全能视频X低价版: 6-30秒
                 - 全能视频X官方版: 6或10秒
-                - 全能视频V3.1-pro: 4/6/8秒
             **kwargs: 额外参数
-                - resolution: 分辨率 (480p/720p/1080p/4k)
-                - aspect_ratio: 宽高比 (2:3/3:2/1:1/16:9/9:16)，取决于模型
+                - resolution: 分辨率 (720p/1080p/4k)
+                - aspect_ratio: 宽高比 (16:9/9:16)，取决于模型
                 - generate_audio: 是否生成音频 (True/False)，仅V3.1-pro支持
                 - extra_images: 额外图片路径列表（仅x-low支持，最多5张额外图片）
 
@@ -266,9 +277,12 @@ class EnterpriseVideoProvider(VideoProvider):
                 print(
                     f"  模式: {'多图参考' if (image_end or extra_images) else '首帧图生视频'}"
                 )
+            elif self.model == "v3.1-fast":
+                # V3.1-fast：首尾帧视频（推荐）
+                print(f"  模式: {'首尾帧视频' if image_end else '首帧图生视频'}")
             elif self.model == "v3.1-pro":
-                # V3.1-pro：支持首尾帧
-                print(f"  模式: {'首尾帧' if image_end else '首帧图生视频'}")
+                # V3.1-pro：参考生视频（高质量）
+                print(f"  模式: {'首尾帧视频' if image_end else '首帧图生视频'}")
             else:
                 # 全能视频X官方版：仅首帧
                 if image_end:
@@ -380,21 +394,37 @@ class EnterpriseVideoProvider(VideoProvider):
             }
             # 忽略尾帧
 
-        else:  # v3.1-pro
-            # 全能视频V3.1-pro：支持首尾帧
+        elif self.model == "v3.1-fast":
+            # 全能视频V3.1-fast：支持首尾帧（低价渠道版）
+            if not image_end:
+                print(f"  ⚠️  v3.1-fast 需要尾帧，仅使用首帧模式")
+
             request_body = {
                 "prompt": prompt,
-                "imageUrl": image_url,
+                "firstFrameUrl": image_url,
+                "aspectRatio": aspect_ratio,
                 "resolution": resolution,
                 "duration": str(duration),
-                "aspectRatio": aspect_ratio,
+            }
+
+            # 添加尾帧
+            if image_end:
+                last_image_url = self._upload_image(image_end)
+                request_body["lastFrameUrl"] = last_image_url
+
+        else:  # v3.1-pro
+            # 全能视频V3.1-pro：参考生视频（官方稳定版）
+            request_body = {
+                "prompt": prompt,
+                "imageUrls": [image_url],
+                "resolution": resolution,
                 "generateAudio": generate_audio,
             }
 
-            # 添加尾帧（可选）
+            # 添加尾帧作为参考图
             if image_end:
                 last_image_url = self._upload_image(image_end)
-                request_body["lastImageUrl"] = last_image_url
+                request_body["imageUrls"].append(last_image_url)
 
         url = f"{self.base_url}{self.endpoint}"
         response = self.session.post(url, json=request_body, timeout=30)

@@ -6,6 +6,10 @@ Video Provider Factory - 视频生成提供者工厂
 支持双 Key 配置：
 - 创作级 Key (RH_CREATOR_KEY): 用于视频生成
 - 通用 Key (RH_API_KEY): 兼容模式
+
+⚡ 推荐配置：
+- 默认使用 enterprise-video + v3.1-fast（低价渠道版，~￥0.5/段）
+- 用户明确要求高质量时使用 v3.1-pro（~￥1.4/段）
 """
 
 import os
@@ -65,30 +69,31 @@ def _get_video_api_key(key_type: str = "auto") -> str:
 
 
 def create_video_provider(
-    provider_type: str = "kling",
+    provider_type: str = "enterprise-video",
     api_key: Optional[str] = None,
     access_key: Optional[str] = None,
     secret_key: Optional[str] = None,
     fast_mode: bool = False,
-    model: str = "x-low",
+    model: str = "v3.1-fast",
 ) -> VideoProvider:
     """
     创建视频生成提供者实例
 
     Args:
         provider_type: 提供者类型
+            - "enterprise-video": 企业级视频（默认推荐）
             - "kling": 可灵AI（需要创作级Key）
             - "seedance": Seedance 2.0（需要创作级Key）
             - "ltx": LTX-2.3（需要创作级Key）
-            - "enterprise-video": 企业级视频（全能视频X/V3.1，使用企业Key）
         api_key: RunningHub API 密钥（可选，如未提供则从环境变量读取）
         access_key: (已弃用) 可灵 Access Key
         secret_key: (已弃用) 可灵 Secret Key
         fast_mode: 是否使用快速模式（仅适用于 Seedance）
         model: 企业级视频模型类型（仅适用于 enterprise-video）
-            - "x-low": 全能视频X低价版（默认，支持多图，最实惠）
+            - "v3.1-fast": 全能视频V3.1-fast首尾帧低价渠道版（默认推荐，~￥0.5/段）
+            - "v3.1-pro": 全能视频V3.1-pro官方稳定版（高质量，~￥1.4/段）
+            - "x-low": 全能视频X低价版（支持多图）
             - "x": 全能视频X官方稳定版
-            - "v3.1-pro": 全能视频V3.1-pro官方稳定版（支持首尾帧）
 
     Returns:
         对应的视频生成提供者实例
@@ -130,7 +135,7 @@ def create_video_provider(
     else:
         raise ValueError(
             f"不支持的提供者类型: {provider_type}\n"
-            f"支持的类型: kling, seedance, ltx, enterprise-video"
+            f"支持的类型: enterprise-video（推荐）, kling, seedance, ltx"
         )
 
 
@@ -142,42 +147,34 @@ def list_video_providers() -> dict:
         提供者信息字典
     """
     return {
-        "kling": {
-            "name": "可灵 AI (O1)",
-            "endpoint": "/kling-video-o1/start-to-end",
-            "capabilities": ["首尾帧视频", "首帧图生视频"],
-            "duration_range": "5-10秒",
-            "key_type": "creator",
-        },
-        "seedance": {
-            "name": "Seedance 2.0 (字节跳动)",
-            "endpoint": "/rhart-video/sparkvideo-2.0/image-to-video",
-            "capabilities": ["首尾帧视频", "首帧图生视频", "音频生成"],
-            "duration_range": "4-15秒",
-            "key_type": "creator",
-        },
-        "ltx": {
-            "name": "LTX-2.3 (Lightricks)",
-            "endpoint": "/rhart-video/ltx-2.3/image-to-video",
-            "capabilities": ["首帧图生视频", "音频生成"],
-            "duration_range": "5-20秒",
-            "key_type": "creator",
-        },
         "enterprise-video": {
-            "name": "企业级视频 (全能视频X/V3.1-pro)",
-            "endpoint": "/rhart-video-g/image-to-video",
+            "name": "企业级视频 (全能视频V3.1/X)",
+            "endpoint": "/rhart-video-v3.1-fast/start-end-to-video",
             "capabilities": [
+                "首尾帧视频(v3.1-fast/pro)",
                 "多图参考(X低价)",
-                "首尾帧(V3.1)",
-                "首帧图生视频",
+                "支持4K分辨率",
                 "音频生成",
-                "高分辨率",
             ],
-            "duration_range": "4-30秒",
+            "duration_range": "8秒",
             "key_type": "enterprise",
             "models": {
+                "v3.1-fast": {
+                    "name": "全能视频V3.1-fast-首尾帧-低价渠道版（推荐）",
+                    "duration": "8秒",
+                    "resolutions": ["720p", "1080p", "4k"],
+                    "estimated_price": "~￥0.5/段",
+                    "supports_first_last_frame": True,
+                },
+                "v3.1-pro": {
+                    "name": "全能视频V3.1-pro-官方稳定版（高质量）",
+                    "duration": "8秒",
+                    "resolutions": ["720p", "1080p", "4k"],
+                    "estimated_price": "~￥1.4/段",
+                    "supports_first_last_frame": True,
+                },
                 "x-low": {
-                    "name": "全能视频X-低价渠道版 (支持多图参考，最实惠)",
+                    "name": "全能视频X-低价渠道版 (支持多图参考)",
                     "duration_range": "6-30秒",
                     "resolutions": ["480p", "720p"],
                     "max_images": 7,
@@ -189,12 +186,30 @@ def list_video_providers() -> dict:
                     "resolutions": ["480p", "720p"],
                     "supports_transition": False,
                 },
-                "v3.1-pro": {
-                    "name": "全能视频V3.1-pro-官方稳定版 (支持首尾帧)",
-                    "duration_range": "4-8秒",
-                    "resolutions": ["720p", "1080p", "4k"],
-                    "supports_first_last_frame": True,
-                },
             },
+        },
+        "kling": {
+            "name": "可灵 AI (O1) - 通过 RunningHub",
+            "endpoint": "/kling-video-o1/start-to-end",
+            "capabilities": ["首尾帧视频", "首帧图生视频"],
+            "duration_range": "5-10秒",
+            "key_type": "creator",
+            "estimated_price": "~￥2.1-5.6/段",
+        },
+        "seedance": {
+            "name": "Seedance 2.0 (字节跳动)",
+            "endpoint": "/rhart-video/sparkvideo-2.0/image-to-video",
+            "capabilities": ["首尾帧视频", "首帧图生视频", "音频生成"],
+            "duration_range": "4-15秒",
+            "key_type": "creator",
+            "estimated_price": "创作级Key计费",
+        },
+        "ltx": {
+            "name": "LTX-2.3 (Lightricks)",
+            "endpoint": "/rhart-video/ltx-2.3/image-to-video",
+            "capabilities": ["首帧图生视频", "音频生成"],
+            "duration_range": "5-20秒",
+            "key_type": "creator",
+            "estimated_price": "创作级Key计费",
         },
     }

@@ -86,10 +86,10 @@ def generate_ppt_video_from_images(
     skip_preview: bool = False,
     prompts_file: Optional[str] = None,
     video_provider: str = "enterprise-video",
-    enterprise_model: str = "v3.1-pro",
+    enterprise_model: str = "v3.1-fast",
 ) -> Optional[Dict[str, Any]]:
     """
-    Generate video from existing PPT images.
+    Generate video from existing PPT slide images.
 
     Args:
         slides_dir: Directory containing PPT slide images.
@@ -102,13 +102,15 @@ def generate_ppt_video_from_images(
         skip_preview: Whether to skip preview video generation.
         prompts_file: Path to transition prompts JSON file.
         video_provider: Video provider type.
-            - "kling": 可灵AI (创作级Key)
-            - "seedance": Seedance 2.0 (创作级Key)
-            - "ltx": LTX-2.3 (创作级Key)
-            - "enterprise-video": 企业级视频 (企业Key，默认)
+            - "enterprise-video": 企业级视频（默认推荐）
+            - "kling": 可灵AI（需用户明确请求）
+            - "seedance": Seedance 2.0（需用户明确请求）
+            - "ltx": LTX-2.3（需用户明确请求）
         enterprise_model: Enterprise video model (仅适用于 enterprise-video)。
-            - "x": 全能视频X
-            - "v3.1-pro": 全能视频V3.1-pro (默认)
+            - "v3.1-fast": 全能视频V3.1-fast首尾帧（默认推荐，~￥0.5/段）
+            - "v3.1-pro": 全能视频V3.1-pro官方稳定版（高质量，~￥1.4/段）
+            - "x-low": 全能视频X低价版（支持多图）
+            - "x": 全能视频X官方稳定版
 
     Returns:
         Result dictionary with generation statistics, or None on failure.
@@ -421,19 +423,20 @@ Notes:
         choices=["kling", "seedance", "ltx", "enterprise-video"],
         default="enterprise-video",
         help="Video generation provider (default: enterprise-video)\n"
-        "  - kling: 可灵AI (需要创作Key)\n"
-        "  - seedance: Seedance 2.0 (需要创作Key)\n"
-        "  - ltx: LTX-2.3 (需要创作Key)\n"
-        "  - enterprise-video: 全能视频X/V3.1 (使用企业Key)",
+        "  - enterprise-video: 企业级视频（默认推荐）\n"
+        "  - kling: 可灵AI（需用户明确请求）\n"
+        "  - seedance: Seedance 2.0（需用户明确请求）\n"
+        "  - ltx: LTX-2.3（需用户明确请求）",
     )
     parser.add_argument(
         "--enterprise-model",
-        choices=["x-low", "x", "v3.1-pro"],
-        default="x-low",
-        help="Enterprise video model (default: x-low)\n"
-        "  - x-low: 全能视频X-低价渠道版（支持多图参考，最实惠）\n"
-        "  - x: 全能视频X-官方稳定版（仅首帧）\n"
-        "  - v3.1-pro: 全能视频V3.1-pro（支持首尾帧）",
+        choices=["v3.1-fast", "v3.1-pro", "x-low", "x"],
+        default="v3.1-fast",
+        help="Enterprise video model (default: v3.1-fast)\n"
+        "  - v3.1-fast: 全能视频V3.1-fast首尾帧（推荐，~￥0.5/段）\n"
+        "  - v3.1-pro: 全能视频V3.1-pro（高质量，~￥1.4/段）\n"
+        "  - x-low: 全能视频X低价版（支持多图）\n"
+        "  - x: 全能视频X官方稳定版",
     )
 
     return parser
